@@ -73,6 +73,30 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	return value, err
 }
 
+func (db *DB) Delete(key []byte) error {
+	if len(key) == 0 {
+		return ErrKeyIsEmpty
+	}
+
+	logRecordPos := db.index.Get(key)
+	if logRecordPos == nil {
+		return nil
+	}
+	logRecord := &data.LogRecord{
+		Key:  key,
+		Type: data.LogRecordDeleted,
+	}
+	_, err := db.appendLogRecord(logRecord)
+	if err != nil {
+		return err
+	}
+
+	if db.index.Delete(key) {
+		return ErrIndexUpdateFailed
+	}
+	return nil
+}
+
 func Open(options Options) (*DB, error) {
 	// 配置项校验
 	if err := checkOptions(options); err != nil {
