@@ -10,4 +10,9 @@ type IOManager interface {
 	// Sync can persist data to the disk
 	Sync() error
 	Close() error
+	Size() (int64, error)
+}
+
+func NewIOManager(filename string) (IOManager, error) {
+	return NewFileIOManager(filename)
 }
