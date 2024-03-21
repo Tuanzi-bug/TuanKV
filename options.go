@@ -3,6 +3,7 @@ package bitcask_go
 import (
 	"bitcask-go/index"
 	"errors"
+	"path"
 )
 
 type Options struct {
@@ -23,4 +24,11 @@ func checkOptions(options Options) error {
 		return errors.New("database data file size must be greater than 0")
 	}
 	return nil
+}
+
+var DefaultOptions = Options{
+	DirPath:      path.Join("../tem"),
+	DataFileSize: 256 * 1024 * 1024, // 256MB
+	SyncWrites:   false,
+	IndexType:    index.Btree,
 }

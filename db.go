@@ -3,6 +3,7 @@ package bitcask_go
 import (
 	"bitcask-go/data"
 	"bitcask-go/index"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -37,7 +38,7 @@ func (db *DB) Put(key []byte, value []byte) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Println(pos)
 	if ok := db.index.Put(key, pos); !ok {
 		return ErrIndexUpdateFailed
 	}
@@ -52,7 +53,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	}
 	logRecordPos := db.index.Get(key)
 
-	if logRecordPos != nil {
+	if logRecordPos == nil {
 		return nil, ErrKeyNotFound
 	}
 
@@ -66,7 +67,8 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	if dataFile == nil {
 		return nil, ErrDataFileNotFound
 	}
-	value, err := dataFile.Read(dataFile.WriteOff)
+
+	value, err := dataFile.Read(logRecordPos.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +93,7 @@ func (db *DB) Delete(key []byte) error {
 		return err
 	}
 
-	if db.index.Delete(key) {
+	if !db.index.Delete(key) {
 		return ErrIndexUpdateFailed
 	}
 	return nil

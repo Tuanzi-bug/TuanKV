@@ -37,7 +37,11 @@ func OpenDataFile(dirpath string, fileId uint32) (*DataFile, error) {
 }
 
 func (df *DataFile) Read(offset int64) ([]byte, error) {
-	return nil, nil
+	lr, _, err := df.GetLogRecord(offset)
+	if err != nil {
+		return nil, err
+	}
+	return lr.Value, nil
 }
 
 func (df *DataFile) GetLogRecord(offset int64) (*LogRecord, int64, error) {
@@ -64,7 +68,7 @@ func (df *DataFile) GetLogRecord(offset int64) (*LogRecord, int64, error) {
 		Type: header.recordType,
 	}
 
-	if keySize > 0 && valueSize > 0 {
+	if keySize > 0 || valueSize > 0 {
 		kvBuf, err := df.readNBytes(keySize+valueSize, offset+headerSize)
 		if err != nil {
 			return nil, 0, err
@@ -72,6 +76,7 @@ func (df *DataFile) GetLogRecord(offset int64) (*LogRecord, int64, error) {
 		logRecord.Key = kvBuf[:keySize]
 		logRecord.Value = kvBuf[keySize:]
 	}
+
 	crc := getLogRecordCRC(logRecord, heardBuf[crc32.Size:headerSize])
 	if crc != header.crc {
 		return nil, 0, ErrInvalidCRC

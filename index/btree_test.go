@@ -7,7 +7,7 @@ import (
 )
 
 func TestBtree_Put(t *testing.T) {
-	bt := NewBtree()
+	bt := NewBTree()
 
 	res1 := bt.Put(nil, &data.LogRecordPos{Fid: 1, Offset: 100})
 	assert.True(t, res1)
@@ -17,7 +17,7 @@ func TestBtree_Put(t *testing.T) {
 }
 
 func TestBtree_Get(t *testing.T) {
-	bt := NewBtree()
+	bt := NewBTree()
 
 	res1 := bt.Put(nil, &data.LogRecordPos{Fid: 1, Offset: 100})
 	assert.True(t, res1)
@@ -35,15 +35,15 @@ func TestBtree_Get(t *testing.T) {
 }
 
 func TestBtree_Delete(t *testing.T) {
-	bt := NewBtree()
+	bt := NewBTree()
 
 	res1 := bt.Put(nil, &data.LogRecordPos{Fid: 1, Offset: 100})
 	assert.True(t, res1)
-	res3 := bt.delete(nil)
+	res3 := bt.Delete(nil)
 	assert.True(t, res3)
 
 	res2 := bt.Put([]byte("hello world"), &data.LogRecordPos{Fid: 1, Offset: 2})
 	assert.True(t, res2)
-	res4 := bt.delete([]byte("hello world"))
+	res4 := bt.Delete([]byte("hello world"))
 	assert.True(t, res4)
 }
