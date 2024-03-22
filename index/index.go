@@ -24,6 +24,7 @@ const (
 	Btree IndexType = iota + 1
 )
 
+// NewIndexer 根据配置返回对应的索引对象
 func NewIndexer(indextype IndexType) Indexer {
 	switch indextype {
 	case Btree:
