@@ -46,8 +46,8 @@ func (db *DB) Put(key []byte, value []byte) error {
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 	if len(key) == 0 {
 		return nil, ErrKeyIsEmpty
 	}
@@ -58,12 +58,16 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		return nil, ErrKeyNotFound
 	}
 
+	return db.getValueByPosition(logRecordPos)
+}
+
+func (db *DB) getValueByPosition(pos *data.LogRecordPos) ([]byte, error) {
 	var dataFile *data.DataFile
 	// 根据ID寻找对应文件对象
-	if db.activeFile.FileId == logRecordPos.Fid {
+	if db.activeFile.FileId == pos.Fid {
 		dataFile = db.activeFile
 	} else {
-		dataFile = db.olderFiles[logRecordPos.Fid]
+		dataFile = db.olderFiles[pos.Fid]
 	}
 
 	if dataFile == nil {
@@ -71,7 +75,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	}
 
 	// 从文件中读取内容
-	value, err := dataFile.Read(logRecordPos.Offset)
+	value, err := dataFile.Read(pos.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +137,64 @@ func Open(options Options) (*DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+func (db *DB) ListKeys() [][]byte {
+	iterator := db.index.Iterator(false)
+	keys := make([][]byte, db.index.Size())
+	var idx int
+	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
+		keys[idx] = iterator.Key()
+		idx++
+	}
+	return keys
+}
+
+func (db *DB) Fold(fn func(key, value []byte) bool) error {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	iterator := db.index.Iterator(false)
+
+	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
+		value, err := db.getValueByPosition(iterator.Value())
+		if err != nil {
+			return err
+		}
+		key := iterator.Key()
+		if !fn(key, value) {
+			break
+		}
+	}
+	return nil
+}
+
+func (db *DB) Close() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	err := db.activeFile.Close()
+	if err != nil {
+		return err
+	}
+	for _, item := range db.olderFiles {
+		if err = item.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *DB) Sync() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	return db.activeFile.Sync()
 }
 
 func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {

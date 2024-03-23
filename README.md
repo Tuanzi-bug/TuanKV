@@ -94,6 +94,32 @@
    2. 解码测试
    3. 
 
+   
+
+1. 定义索引迭代器接口
+   1. 定义btree树索引迭代器
+      1. 当前下标 currIndex
+      2. reverse 反向遍历标志
+      3. value 存放key+位置索引信息
+   2. 实现接口的每一个方法
+   3. 实现创建btree索引迭代器的函数
+   4. 在Index的接口添加一个返回迭代器的一个方法 Iterator
+   5. 增加单元测试
+
+
+1. 对外的迭代器
+   1. 设置迭代器配置项
+   2. 定义默认索引迭代器
+   3. 面向用户方法与内部一致
+      1. 对Value方法需要返回对应的值
+      2. 根据get方法进行简化，根据位置信息获取value值
+   4. 需要增加判断是否满足前缀要求
+   5. 获取数据库所有的key--ListKeys
+   6. 索引新增一个Size方法，方便获取长度
+   7. 对数据库信息执行指定操作Fold 
+   8. 不全数据库close与sync方法
+   9. close：关闭当前活跃文件以及遍历并关闭旧的文件，该方法需要加锁
+   10. sync：对当前活跃文件进行持久化
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/

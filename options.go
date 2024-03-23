@@ -16,6 +16,11 @@ type Options struct {
 	IndexType index.IndexType
 }
 
+type IteratorOptions struct {
+	Prefix  []byte
+	Reverse bool
+}
+
 func checkOptions(options Options) error {
 	if len(options.DirPath) == 0 {
 		return errors.New("database dir path is empty")
@@ -31,4 +36,9 @@ var DefaultOptions = Options{
 	DataFileSize: 256 * 1024 * 1024, // 256MB
 	SyncWrites:   false,
 	IndexType:    index.Btree,
+}
+
+var DefaultIteratorOptions = IteratorOptions{
+	Prefix:  nil,
+	Reverse: false,
 }
