@@ -19,6 +19,7 @@ type DB struct {
 	activeFile *data.DataFile            //当前正在写入的文件
 	olderFiles map[uint32]*data.DataFile // 历史文件
 	index      index.Indexer             //索引
+	seqNo      uint64
 }
 
 // Put is a method to store the key-value pair in the storage engine
@@ -28,13 +29,13 @@ func (db *DB) Put(key []byte, value []byte) error {
 	}
 	// 构建一条记录
 	logRecord := &data.LogRecord{
-		Key:   key,
+		Key:   logRecordKeyWithSeq(key, nonTransactionSeqNo),
 		Value: value,
 		Type:  data.LogRecordNormal,
 	}
 
 	// 添加进入文件中
-	pos, err := db.appendLogRecord(logRecord)
+	pos, err := db.appendLogRecordWithLock(logRecord)
 	if err != nil {
 		return err
 	}
@@ -94,11 +95,11 @@ func (db *DB) Delete(key []byte) error {
 	}
 	// 构建新的记录信息，状态是删除状态（对某一个数据进行删除操作，仅仅添加对应的状态记录，不进行真实删除）
 	logRecord := &data.LogRecord{
-		Key:  key,
+		Key:  logRecordKeyWithSeq(key, nonTransactionSeqNo),
 		Type: data.LogRecordDeleted,
 	}
 	// 写入记录
-	_, err := db.appendLogRecord(logRecord)
+	_, err := db.appendLogRecordWithLock(logRecord)
 	if err != nil {
 		return err
 	}
@@ -197,10 +198,13 @@ func (db *DB) Sync() error {
 	return db.activeFile.Sync()
 }
 
-func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
+func (db *DB) appendLogRecordWithLock(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+	return db.appendLogRecord(logRecord)
+}
 
+func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
 	if db.activeFile == nil {
 		if err := db.setActiveDataFile(); err != nil {
 			return nil, err
@@ -298,6 +302,22 @@ func (db *DB) loadIndexFromDataFiles() error {
 	if len(db.fileIds) == 0 {
 		return nil
 	}
+
+	updateIndex := func(key []byte, typ data.LogRecordType, pos *data.LogRecordPos) error {
+		var ok bool
+		//根据类型对记录进行相对应处理
+		if typ == data.LogRecordDeleted {
+			ok = db.index.Delete(key)
+		} else {
+			ok = db.index.Put(key, pos)
+		}
+		if !ok {
+			panic(ErrIndexUpdateFailed)
+		}
+		return nil
+	}
+	transactionRecords := make(map[uint64][]*data.TransactionRecord)
+	var currentSeqNo uint64 = nonTransactionSeqNo
 	// 遍历文件id
 	for i, fid := range db.fileIds {
 		var dataFile *data.DataFile
@@ -325,17 +345,37 @@ func (db *DB) loadIndexFromDataFiles() error {
 				Fid:    fid,
 				Offset: offset,
 			}
-			//根据类型对记录进行相对应处理
-			if logRecord.Type == data.LogRecordDeleted {
-				db.index.Delete(logRecord.Key)
+
+			realkey, seqNo := parseLogRecordKey(logRecord.Key)
+			if seqNo == nonTransactionSeqNo {
+				if err := updateIndex(realkey, logRecord.Type, logRecordPos); err != nil {
+					return err
+				}
 			} else {
-				db.index.Put(logRecord.Key, logRecordPos)
+				if logRecord.Type == data.LogRecordFinished {
+					for _, txnRecord := range transactionRecords[seqNo] {
+						if err := updateIndex(txnRecord.Record.Key, txnRecord.Record.Type, txnRecord.Pos); err != nil {
+							return err
+						}
+					}
+					delete(transactionRecords, seqNo)
+				} else {
+					logRecord.Key = realkey
+					transactionRecords[seqNo] = append(transactionRecords[seqNo], &data.TransactionRecord{
+						Record: logRecord,
+						Pos:    logRecordPos,
+					})
+				}
+			}
+			if seqNo > nonTransactionSeqNo {
+				currentSeqNo = seqNo
 			}
 			offset += size
 		}
 		if i == len(db.fileIds)-1 {
 			db.activeFile.WriteOff = offset
 		}
+		db.seqNo = currentSeqNo
 	}
 	return nil
 }

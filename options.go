@@ -21,6 +21,11 @@ type IteratorOptions struct {
 	Reverse bool
 }
 
+type WriteBatchOptions struct {
+	MaxBatchNum int
+	SyncWrites  bool
+}
+
 func checkOptions(options Options) error {
 	if len(options.DirPath) == 0 {
 		return errors.New("database dir path is empty")
@@ -41,4 +46,9 @@ var DefaultOptions = Options{
 var DefaultIteratorOptions = IteratorOptions{
 	Prefix:  nil,
 	Reverse: false,
+}
+
+var DefaultWriteBatchOptions = WriteBatchOptions{
+	MaxBatchNum: 10000,
+	SyncWrites:  false,
 }

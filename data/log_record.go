@@ -10,6 +10,7 @@ type LogRecordType = byte
 const (
 	LogRecordNormal LogRecordType = iota
 	LogRecordDeleted
+	LogRecordFinished
 )
 
 // crc + type+keySize+valueSize= 4+1+5+5
@@ -33,6 +34,11 @@ type LogRecordHeader struct {
 type LogRecordPos struct {
 	Fid    uint32 // File ID : represents that the file in which the data will be stored.
 	Offset int64  // offset in the file : represents where the data will be stored in the data file.
+}
+
+type TransactionRecord struct {
+	Record *LogRecord
+	Pos    *LogRecordPos
 }
 
 func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
