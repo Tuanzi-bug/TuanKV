@@ -5,6 +5,7 @@ import (
 	"bitcask-go/index"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ type DB struct {
 	olderFiles map[uint32]*data.DataFile // 历史文件
 	index      index.Indexer             //索引
 	seqNo      uint64
+	isMerging  bool
 }
 
 // Put is a method to store the key-value pair in the storage engine
@@ -129,6 +131,13 @@ func Open(options Options) (*DB, error) {
 		olderFiles: make(map[uint32]*data.DataFile),
 		index:      index.NewIndexer(options.IndexType),
 	}
+	if err := db.loadMergeFiles(); err != nil {
+		return nil, err
+	}
+	if err := db.loadIndexFromHintFile(); err != nil {
+		return nil, err
+	}
+
 	// 加载数据文件信息
 	if err := db.loadDataFile(); err != nil {
 		return nil, err
@@ -303,6 +312,17 @@ func (db *DB) loadIndexFromDataFiles() error {
 		return nil
 	}
 
+	hasMerge, nonMergeFileId := false, uint32(0)
+	mergeFileName := filepath.Join(db.options.DirPath, data.MergeFinishedFileName)
+	if _, err := os.Stat(mergeFileName); err == nil {
+		fid, err := db.getNonMergeFileId(mergeFileName)
+		if err != nil {
+			return err
+		}
+		nonMergeFileId = fid
+		hasMerge = true
+	}
+
 	updateIndex := func(key []byte, typ data.LogRecordType, pos *data.LogRecordPos) error {
 		var ok bool
 		//根据类型对记录进行相对应处理
@@ -320,6 +340,9 @@ func (db *DB) loadIndexFromDataFiles() error {
 	var currentSeqNo uint64 = nonTransactionSeqNo
 	// 遍历文件id
 	for i, fid := range db.fileIds {
+		if hasMerge && fid < nonMergeFileId {
+			continue
+		}
 		var dataFile *data.DataFile
 		// 根据id获取对应的结构体
 		if fid == db.activeFile.FileId {

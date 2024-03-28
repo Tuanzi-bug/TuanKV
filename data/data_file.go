@@ -7,6 +7,7 @@ import (
 	"hash/crc32"
 	"io"
 	"path"
+	"path/filepath"
 )
 
 var (
@@ -14,7 +15,9 @@ var (
 )
 
 const (
-	DataFileNameSuffix = ".data"
+	DataFileNameSuffix    = ".data"
+	HintFileName          = "hint-index"
+	MergeFinishedFileName = "merge-finished"
 )
 
 type DataFile struct {
@@ -23,19 +26,10 @@ type DataFile struct {
 	IoManager fio.IOManager
 }
 
-func OpenDataFile(dirpath string, fileId uint32) (*DataFile, error) {
+func OpenDataFile(dirPath string, fileId uint32) (*DataFile, error) {
 	// 获取文件路径
-	fileName := path.Join(dirpath, fmt.Sprintf("%d", fileId)+DataFileNameSuffix)
-	// 创建文件对应的io结构体
-	ioManager, err := fio.NewIOManager(fileName)
-	if err != nil {
-		return nil, err
-	}
-	return &DataFile{
-		FileId:    fileId,
-		WriteOff:  0,
-		IoManager: ioManager,
-	}, nil
+	fileName := GetDataFileName(dirPath, fileId)
+	return newDataFile(fileName, fileId)
 }
 
 func (df *DataFile) Read(offset int64) ([]byte, error) {
@@ -108,4 +102,42 @@ func (df *DataFile) readNBytes(n int64, offset int64) (b []byte, err error) {
 	b = make([]byte, n)
 	_, err = df.IoManager.Read(b, offset)
 	return
+}
+
+func OpenHintFile(dirPath string) (*DataFile, error) {
+	fileName := filepath.Join(dirPath, DataFileNameSuffix)
+	return newDataFile(fileName, 0)
+}
+
+func GetDataFileName(dirPath string, fileId uint32) string {
+	return path.Join(dirPath, fmt.Sprintf("%d", fileId)+DataFileNameSuffix)
+}
+
+func newDataFile(fileName string, fileId uint32) (*DataFile, error) {
+	// 创建文件对应的io结构体
+	ioManager, err := fio.NewIOManager(fileName)
+	if err != nil {
+		return nil, err
+	}
+	return &DataFile{
+		FileId:    fileId,
+		WriteOff:  0,
+		IoManager: ioManager,
+	}, nil
+}
+
+func (df *DataFile) WriteHintRecord(key []byte, pos *LogRecordPos) error {
+	record := &LogRecord{
+		Key:   key,
+		Value: EncodeLogRecordPos(pos),
+	}
+	encRecord, _ := EncodeLogRecord(record)
+	return df.Write(encRecord)
+}
+
+// todo: 为什么这里是写入一个文件而不是一个标识
+
+func OpenMergeFinishedFile(dirPath string) (*DataFile, error) {
+	fileName := filepath.Join(dirPath, MergeFinishedFileName)
+	return newDataFile(fileName, 0)
 }
