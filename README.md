@@ -191,6 +191,14 @@
 8. 将新的数据文件移动到数据目录中
 9. 加载引擎之前，加载merge的数据目录，从hint文件中加载索引
 
+
+1. 内存索引优化
+   1. 添加自适应基树索引，创建结构体AdaptiveRadixTree 
+   2. 实现索引对应的四个方法【迭代器方法可以仿照btree树进行编写】，注意：需要加读锁与写锁
+   3. 创建一个初始化基础树方法
+   4. 写相关的单元测试
+2. 添加 B+树 索引【封装了bbolt库】
+   1. 
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/
