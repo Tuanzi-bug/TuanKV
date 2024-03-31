@@ -13,6 +13,7 @@ type Indexer interface {
 	Delete(key []byte) bool                      // delete is a interface method that deletes the data record from the index.
 	Iterator(reverse bool) Iterator
 	Size() int
+	Close() error
 }
 
 type Item struct {
@@ -24,13 +25,20 @@ type IndexType = int8
 
 const (
 	Btree IndexType = iota + 1
+	Art
+	BPTree
 )
 
 // NewIndexer 根据配置返回对应的索引对象
-func NewIndexer(indextype IndexType) Indexer {
+func NewIndexer(indextype IndexType, dirPath string) Indexer {
 	switch indextype {
 	case Btree:
 		return NewBTree()
+	case Art:
+		return NewART()
+	case BPTree:
+		return NewBPlusTree(dirPath)
+
 	default:
 		panic("unsupported index type")
 	}

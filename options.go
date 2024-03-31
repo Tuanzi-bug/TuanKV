@@ -40,7 +40,7 @@ var DefaultOptions = Options{
 	DirPath:      path.Join("../tem"),
 	DataFileSize: 256 * 1024 * 1024, // 256MB
 	SyncWrites:   false,
-	IndexType:    index.Btree,
+	IndexType:    index.BPTree,
 }
 
 var DefaultIteratorOptions = IteratorOptions{

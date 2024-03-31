@@ -18,6 +18,7 @@ const (
 	DataFileNameSuffix    = ".data"
 	HintFileName          = "hint-index"
 	MergeFinishedFileName = "merge-finished"
+	SeqNoFileName         = "seq-no"
 )
 
 type DataFile struct {
@@ -106,6 +107,11 @@ func (df *DataFile) readNBytes(n int64, offset int64) (b []byte, err error) {
 
 func OpenHintFile(dirPath string) (*DataFile, error) {
 	fileName := filepath.Join(dirPath, DataFileNameSuffix)
+	return newDataFile(fileName, 0)
+}
+
+func OpenSeqNoFile(dirPath string) (*DataFile, error) {
+	fileName := filepath.Join(dirPath, SeqNoFileName)
 	return newDataFile(fileName, 0)
 }
 

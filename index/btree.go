@@ -64,6 +64,10 @@ func (bt *BTree) Size() int {
 	return bt.tree.Len()
 }
 
+func (bt *BTree) Close() error {
+	return nil
+}
+
 type btreeIterator struct {
 	curIndex int     //当前遍历的下标位置
 	reverse  bool    //是否反向
@@ -90,33 +94,33 @@ func newBTreeIterator(tree *btree.BTree, reverse bool) *btreeIterator {
 	}
 }
 
-func (bti *btreeIterator) Rewind() {
-	bti.curIndex = 0
+func (bpt *btreeIterator) Rewind() {
+	bpt.curIndex = 0
 }
-func (bti *btreeIterator) Seek(key []byte) {
-	if bti.reverse {
-		bti.curIndex = sort.Search(len(bti.values), func(i int) bool {
-			return bytes.Compare(bti.values[i].key, key) <= 0
+func (bpt *btreeIterator) Seek(key []byte) {
+	if bpt.reverse {
+		bpt.curIndex = sort.Search(len(bpt.values), func(i int) bool {
+			return bytes.Compare(bpt.values[i].key, key) <= 0
 		})
 	} else {
-		bti.curIndex = sort.Search(len(bti.values), func(i int) bool {
-			return bytes.Compare(bti.values[i].key, key) >= 0
+		bpt.curIndex = sort.Search(len(bpt.values), func(i int) bool {
+			return bytes.Compare(bpt.values[i].key, key) >= 0
 		})
 	}
 }
 
-func (bti *btreeIterator) Next() {
-	bti.curIndex += 1
+func (bpt *btreeIterator) Next() {
+	bpt.curIndex += 1
 }
-func (bti *btreeIterator) Valid() bool {
-	return bti.curIndex < len(bti.values)
+func (bpt *btreeIterator) Valid() bool {
+	return bpt.curIndex < len(bpt.values)
 }
-func (bti *btreeIterator) Key() []byte {
-	return bti.values[bti.curIndex].key
+func (bpt *btreeIterator) Key() []byte {
+	return bpt.values[bpt.curIndex].key
 }
-func (bti *btreeIterator) Value() *data.LogRecordPos {
-	return bti.values[bti.curIndex].pos
+func (bpt *btreeIterator) Value() *data.LogRecordPos {
+	return bpt.values[bpt.curIndex].pos
 }
-func (bti *btreeIterator) Close() {
-	bti.values = nil
+func (bpt *btreeIterator) Close() {
+	bpt.values = nil
 }

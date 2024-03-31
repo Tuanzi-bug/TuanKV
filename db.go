@@ -3,7 +3,9 @@ package bitcask_go
 import (
 	"bitcask-go/data"
 	"bitcask-go/index"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,16 +14,20 @@ import (
 	"sync"
 )
 
+const seqNoKey = "seq-no"
+
 // DB is Storage engine instance of bitcask
 type DB struct {
-	options    Options                   // 用户的配置项
-	fileIds    []uint32                  //文件对应的ID
-	mu         *sync.RWMutex             //锁
-	activeFile *data.DataFile            //当前正在写入的文件
-	olderFiles map[uint32]*data.DataFile // 历史文件
-	index      index.Indexer             //索引
-	seqNo      uint64
-	isMerging  bool
+	options         Options                   // 用户的配置项
+	fileIds         []uint32                  //文件对应的ID
+	mu              *sync.RWMutex             //锁
+	activeFile      *data.DataFile            //当前正在写入的文件
+	olderFiles      map[uint32]*data.DataFile // 历史文件
+	index           index.Indexer             //索引
+	seqNo           uint64
+	isMerging       bool
+	seqNoFileExists bool
+	isInitial       bool
 }
 
 // Put is a method to store the key-value pair in the storage engine
@@ -118,23 +124,33 @@ func Open(options Options) (*DB, error) {
 		return nil, err
 	}
 
+	var isInitial bool
+
 	// 判断目录地址是否存在
 	if _, err := os.Stat(options.DirPath); err != nil {
+		isInitial = true
 		if err := os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
 			return nil, err
 		}
 	}
+
+	entries, err := os.ReadDir(options.DirPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) == 0 {
+		isInitial = true
+	}
+
 	db := &DB{
 		options:    options,
 		mu:         new(sync.RWMutex),
 		activeFile: nil,
 		olderFiles: make(map[uint32]*data.DataFile),
-		index:      index.NewIndexer(options.IndexType),
+		index:      index.NewIndexer(options.IndexType, options.DirPath),
+		isInitial:  isInitial,
 	}
 	if err := db.loadMergeFiles(); err != nil {
-		return nil, err
-	}
-	if err := db.loadIndexFromHintFile(); err != nil {
 		return nil, err
 	}
 
@@ -142,10 +158,28 @@ func Open(options Options) (*DB, error) {
 	if err := db.loadDataFile(); err != nil {
 		return nil, err
 	}
-	// 加载索引信息（和文件信息对应）
-	if err := db.loadIndexFromDataFiles(); err != nil {
-		return nil, err
+
+	if options.IndexType != index.BPTree {
+		if err := db.loadIndexFromHintFile(); err != nil {
+			return nil, err
+		}
+		// 加载索引信息（和文件信息对应）
+		if err := db.loadIndexFromDataFiles(); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := db.loadSeqNo(); err != nil {
+			return nil, err
+		}
+		if db.activeFile != nil {
+			size, err := db.activeFile.IoManager.Size()
+			if err != nil {
+				return nil, err
+			}
+			db.activeFile.WriteOff = size
+		}
 	}
+
 	return db, nil
 }
 
@@ -165,7 +199,7 @@ func (db *DB) Fold(fn func(key, value []byte) bool) error {
 	defer db.mu.RUnlock()
 
 	iterator := db.index.Iterator(false)
-
+	defer iterator.Close()
 	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
 		value, err := db.getValueByPosition(iterator.Value())
 		if err != nil {
@@ -180,13 +214,32 @@ func (db *DB) Fold(fn func(key, value []byte) bool) error {
 }
 
 func (db *DB) Close() error {
+	if err := db.index.Close(); err != nil {
+		return err
+	}
 	if db.activeFile == nil {
 		return nil
 	}
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	err := db.activeFile.Close()
+	seqDataFile, err := data.OpenSeqNoFile(db.options.DirPath)
+	if err != nil {
+		return err
+	}
+	record := &data.LogRecord{
+		Key:   []byte(seqNoKey),
+		Value: []byte(strconv.FormatUint(db.seqNo, 10)),
+	}
+	encRecord, _ := data.EncodeLogRecord(record)
+	if err := seqDataFile.Write(encRecord); err != nil {
+		return err
+	}
+	if err := seqDataFile.Sync(); err != nil {
+		return err
+	}
+
+	err = db.activeFile.Close()
 	if err != nil {
 		return err
 	}
@@ -401,4 +454,26 @@ func (db *DB) loadIndexFromDataFiles() error {
 		db.seqNo = currentSeqNo
 	}
 	return nil
+}
+
+func (db *DB) loadSeqNo() error {
+	fileName := filepath.Join(db.options.DirPath, data.SeqNoFileName)
+	if _, err := os.Stat(fileName); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	file, err := data.OpenSeqNoFile(db.options.DirPath)
+	if err != nil {
+		return err
+	}
+	record, _, err := file.GetLogRecord(0)
+	if err != nil {
+		return err
+	}
+	seqNo, err := strconv.ParseUint(string(record.Value), 10, 64)
+	if err != nil {
+		return err
+	}
+	db.seqNoFileExists = true
+	db.seqNo = seqNo
+	return os.Remove(fileName)
 }
