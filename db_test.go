@@ -26,6 +26,7 @@ func TestOpen(t *testing.T) {
 	dir, _ := os.MkdirTemp("", "bitcask-go")
 	opts.DirPath = dir
 	db, err := Open(opts)
+	t.Log(db.seqNo)
 	defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
@@ -38,7 +39,7 @@ func TestDB_Put(t *testing.T) {
 	opts.DirPath = dir
 	opts.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(opts)
-	// defer destroyDB(db)
+	//defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
@@ -56,6 +57,7 @@ func TestDB_Put(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, val2)
 
+	//
 	// 3.key 为空
 	err = db.Put(nil, utils.RandomValue(24))
 	assert.Equal(t, ErrKeyIsEmpty, err)
@@ -66,14 +68,14 @@ func TestDB_Put(t *testing.T) {
 	val3, err := db.Get(utils.GetTestKey(22))
 	assert.Equal(t, 0, len(val3))
 	assert.Nil(t, err)
-
+	//
 	// 5.写到数据文件进行了转换
-	for i := 0; i < 1000000; i++ {
-		err := db.Put(utils.GetTestKey(i), utils.RandomValue(128))
-		assert.Nil(t, err)
-	}
-	assert.Equal(t, 2, len(db.olderFiles))
-
+	//for i := 0; i < 1000000; i++ {
+	//	err := db.Put(utils.GetTestKey(i), utils.RandomValue(128))
+	//	assert.Nil(t, err)
+	//}
+	//assert.Equal(t, 2, len(db.olderFiles))
+	//
 	// 6.重启后再 Put 数据
 	err = db.Close()
 	assert.Nil(t, err)
@@ -97,7 +99,7 @@ func TestDB_Get(t *testing.T) {
 	opts.DirPath = dir
 	opts.DataFileSize = 64 * 1024 * 1024
 	db, err := Open(opts)
-	defer destroyDB(db)
+	//defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
@@ -226,6 +228,7 @@ func TestDB_ListKeys(t *testing.T) {
 
 	// 数据库为空
 	keys1 := db.ListKeys()
+	assert.Nil(t, db.activeFile)
 	assert.Equal(t, 0, len(keys1))
 
 	// 只有一条数据

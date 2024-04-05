@@ -3,9 +3,8 @@ package bitcask_go
 import (
 	"bitcask-go/data"
 	"bitcask-go/index"
-	"errors"
+	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -169,6 +168,7 @@ func Open(options Options) (*DB, error) {
 		}
 	} else {
 		if err := db.loadSeqNo(); err != nil {
+			fmt.Println(err)
 			return nil, err
 		}
 		if db.activeFile != nil {
@@ -185,6 +185,7 @@ func Open(options Options) (*DB, error) {
 
 func (db *DB) ListKeys() [][]byte {
 	iterator := db.index.Iterator(false)
+	defer iterator.Close()
 	keys := make([][]byte, db.index.Size())
 	var idx int
 	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
@@ -214,32 +215,37 @@ func (db *DB) Fold(fn func(key, value []byte) bool) error {
 }
 
 func (db *DB) Close() error {
-	if err := db.index.Close(); err != nil {
-		return err
-	}
+	defer func() {
+		if err := db.index.Close(); err != nil {
+			panic("failed to close index")
+		}
+	}()
 	if db.activeFile == nil {
 		return nil
 	}
+	fmt.Println(1)
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	seqDataFile, err := data.OpenSeqNoFile(db.options.DirPath)
-	if err != nil {
-		return err
-	}
-	record := &data.LogRecord{
-		Key:   []byte(seqNoKey),
-		Value: []byte(strconv.FormatUint(db.seqNo, 10)),
-	}
-	encRecord, _ := data.EncodeLogRecord(record)
-	if err := seqDataFile.Write(encRecord); err != nil {
-		return err
-	}
-	if err := seqDataFile.Sync(); err != nil {
-		return err
+	if db.seqNo > 0 {
+		seqDataFile, err := data.OpenSeqNoFile(db.options.DirPath)
+		if err != nil {
+			return err
+		}
+		record := &data.LogRecord{
+			Key:   []byte(seqNoKey),
+			Value: []byte(strconv.FormatUint(db.seqNo, 10)),
+		}
+		encRecord, _ := data.EncodeLogRecord(record)
+		if err := seqDataFile.Write(encRecord); err != nil {
+			return err
+		}
+		if err := seqDataFile.Sync(); err != nil {
+			return err
+		}
 	}
 
-	err = db.activeFile.Close()
+	err := db.activeFile.Close()
 	if err != nil {
 		return err
 	}
@@ -458,7 +464,7 @@ func (db *DB) loadIndexFromDataFiles() error {
 
 func (db *DB) loadSeqNo() error {
 	fileName := filepath.Join(db.options.DirPath, data.SeqNoFileName)
-	if _, err := os.Stat(fileName); errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		return nil
 	}
 	file, err := data.OpenSeqNoFile(db.options.DirPath)

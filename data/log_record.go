@@ -93,8 +93,8 @@ func getLogRecordCRC(lr *LogRecord, header []byte) uint32 {
 func EncodeLogRecordPos(pos *LogRecordPos) []byte {
 	buf := make([]byte, binary.MaxVarintLen32+binary.MaxVarintLen64)
 	index := 0
-	index += binary.PutUvarint(buf, uint64(pos.Fid))
-	index += binary.PutVarint(buf, pos.Offset)
+	index += binary.PutUvarint(buf[index:], uint64(pos.Fid))
+	index += binary.PutVarint(buf[index:], pos.Offset)
 	return buf[:index]
 }
 
