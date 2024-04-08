@@ -14,6 +14,10 @@ type Options struct {
 	SyncWrites bool
 
 	IndexType index.IndexType
+
+	BytesPerSync uint
+
+	MMapAtStartup bool
 }
 
 type IteratorOptions struct {
@@ -37,10 +41,12 @@ func checkOptions(options Options) error {
 }
 
 var DefaultOptions = Options{
-	DirPath:      path.Join("../tem"),
-	DataFileSize: 256 * 1024 * 1024, // 256MB
-	SyncWrites:   false,
-	IndexType:    index.BPTree,
+	DirPath:       path.Join("../tem"),
+	DataFileSize:  256 * 1024 * 1024, // 256MB
+	SyncWrites:    false,
+	IndexType:     index.BPTree,
+	BytesPerSync:  0,
+	MMapAtStartup: true,
 }
 
 var DefaultIteratorOptions = IteratorOptions{

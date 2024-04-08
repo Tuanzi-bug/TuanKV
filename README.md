@@ -205,6 +205,34 @@
 5. 新增一个方法：读取序列号，当索引是b+树时候
 6. 新增一个字段，判断是否存在事务序列号文件，如果不存在禁用WriteBatch
 7. 新增一个标识，是否第一次初始化此数据目录
+
+
+1. 文件IO优化
+   1. 文件锁：保证存储引擎实例在单进程执行
+      1. 添加flock库
+      2. 在打开db函数中，添加当前目录是否正在使用，进行new。
+      3. 自定义文件锁名称 fileLockName
+      4. 调用treLock，返回特定错误 ErrDatabaseIsUsing
+      5. 将文件锁添加到db的结构体当中
+      6. 在关闭数据库时候，将文件锁进行释放掉
+      7. 写单元测试
+   2. 对持久化策略进行改动
+      1. 添加选项BytesPerSync，累计写到阈值再进行持久化
+      2. 默认是0
+      3. 再db结构体中添加 新的字段bytesWrite 记录写入多少字节
+      4. 再appendlog进行判断，条件：是否持久化 阈值大于0 当前写入字节大于阈值
+      5. 持久化后累计值清空
+   3. 对启动加速
+      1. 定义MMap结构体
+      2. 实现iomannger对应的方法
+      3. 实现新建mmap的方法
+      4. 添加单元测试
+      5. 初始化io函数中添加一个初始化类型，添加一个枚举io，根据类型生成不同io
+      6. 对newDatafile 需要添加一个io类型，打开需要指定io类型，其他默认fileio
+      7. 添加配置项 MMapAtStartup，添加一个默认值
+      8. 加载过程中需要修改io类型
+      9. 需要重置io类型，添加resetIoType 方法
+      10. 对文件添加一个重置io类型
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/

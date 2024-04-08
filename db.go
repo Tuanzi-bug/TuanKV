@@ -2,8 +2,10 @@ package bitcask_go
 
 import (
 	"bitcask-go/data"
+	"bitcask-go/fio"
 	"bitcask-go/index"
 	"fmt"
+	"github.com/gofrs/flock"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,7 +15,10 @@ import (
 	"sync"
 )
 
-const seqNoKey = "seq-no"
+const (
+	seqNoKey     = "seq-no"
+	fileLockName = "flock"
+)
 
 // DB is Storage engine instance of bitcask
 type DB struct {
@@ -27,6 +32,8 @@ type DB struct {
 	isMerging       bool
 	seqNoFileExists bool
 	isInitial       bool
+	fileLock        *flock.Flock
+	bytesWrite      uint
 }
 
 // Put is a method to store the key-value pair in the storage engine
@@ -133,6 +140,15 @@ func Open(options Options) (*DB, error) {
 		}
 	}
 
+	fileLock := flock.New(filepath.Join(options.DirPath, fileLockName))
+	hold, err := fileLock.TryLock()
+	if err != nil {
+		return nil, err
+	}
+	if !hold {
+		return nil, ErrDatabaseIsUsing
+	}
+
 	entries, err := os.ReadDir(options.DirPath)
 	if err != nil {
 		return nil, err
@@ -148,6 +164,7 @@ func Open(options Options) (*DB, error) {
 		olderFiles: make(map[uint32]*data.DataFile),
 		index:      index.NewIndexer(options.IndexType, options.DirPath),
 		isInitial:  isInitial,
+		fileLock:   fileLock,
 	}
 	if err := db.loadMergeFiles(); err != nil {
 		return nil, err
@@ -165,6 +182,11 @@ func Open(options Options) (*DB, error) {
 		// 加载索引信息（和文件信息对应）
 		if err := db.loadIndexFromDataFiles(); err != nil {
 			return nil, err
+		}
+		if db.options.MMapAtStartup {
+			if err := db.resetIOType(); err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		if err := db.loadSeqNo(); err != nil {
@@ -216,6 +238,9 @@ func (db *DB) Fold(fn func(key, value []byte) bool) error {
 
 func (db *DB) Close() error {
 	defer func() {
+		if err := db.fileLock.Unlock(); err != nil {
+			panic(fmt.Sprintf("failed to unlock the directory, %v", err))
+		}
 		if err := db.index.Close(); err != nil {
 			panic("failed to close index")
 		}
@@ -223,7 +248,6 @@ func (db *DB) Close() error {
 	if db.activeFile == nil {
 		return nil
 	}
-	fmt.Println(1)
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -295,18 +319,27 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 		}
 	}
 	// 当前文件的偏移值开始写
-	writeoff := db.activeFile.WriteOff
+	writeOff := db.activeFile.WriteOff
 	if err := db.activeFile.Write(encRecord); err != nil {
 		return nil, err
 	}
 
-	if db.options.SyncWrites {
+	db.bytesWrite += uint(size)
+	var needSync = db.options.SyncWrites
+	if !needSync && db.options.BytesPerSync > 0 && db.bytesWrite >= db.options.BytesPerSync {
+		needSync = true
+	}
+
+	if needSync {
 		if err := db.activeFile.Sync(); err != nil {
 			return nil, err
 		}
+		if db.bytesWrite > 0 {
+			db.bytesWrite = 0
+		}
 	}
 	// 返回记录所对应的文件信息
-	pos := &data.LogRecordPos{Fid: db.activeFile.FileId, Offset: writeoff}
+	pos := &data.LogRecordPos{Fid: db.activeFile.FileId, Offset: writeOff}
 	return pos, nil
 }
 
@@ -317,7 +350,7 @@ func (db *DB) setActiveDataFile() error {
 		initialFileId = db.activeFile.FileId + 1
 	}
 	// 创建新的文件，返回相关结构体
-	dataFile, err := data.OpenDataFile(db.options.DirPath, initialFileId)
+	dataFile, err := data.OpenDataFile(db.options.DirPath, initialFileId, fio.StandardFIO)
 	if err != nil {
 		return err
 	}
@@ -353,7 +386,11 @@ func (db *DB) loadDataFile() error {
 	db.fileIds = fileIds
 	// 遍历文件id，区分历史文件id和正在写入文件id
 	for i, fid := range fileIds {
-		datafile, err := data.OpenDataFile(db.options.DirPath, fid)
+		ioType := fio.StandardFIO
+		if db.options.MMapAtStartup {
+			ioType = fio.MemoryMap
+		}
+		datafile, err := data.OpenDataFile(db.options.DirPath, fid, ioType)
 		if err != nil {
 			return err
 		}
@@ -482,4 +519,19 @@ func (db *DB) loadSeqNo() error {
 	db.seqNoFileExists = true
 	db.seqNo = seqNo
 	return os.Remove(fileName)
+}
+
+func (db *DB) resetIOType() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	if err := db.activeFile.SetIOManager(db.options.DirPath, fio.StandardFIO); err != nil {
+		return err
+	}
+	for _, dataFile := range db.olderFiles {
+		if err := dataFile.SetIOManager(db.options.DirPath, fio.StandardFIO); err != nil {
+			return err
+		}
+	}
+	return nil
 }
