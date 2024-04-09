@@ -4,6 +4,7 @@ import (
 	"bitcask-go/data"
 	"bitcask-go/fio"
 	"bitcask-go/index"
+	"bitcask-go/utils"
 	"fmt"
 	"github.com/gofrs/flock"
 	"io"
@@ -34,6 +35,14 @@ type DB struct {
 	isInitial       bool
 	fileLock        *flock.Flock
 	bytesWrite      uint
+	reclaimSize     int64
+}
+
+type Stat struct {
+	keyNum          uint
+	DataFileNum     uint
+	reclaimableSize int64
+	DiskSize        int64
 }
 
 // Put is a method to store the key-value pair in the storage engine
@@ -54,8 +63,8 @@ func (db *DB) Put(key []byte, value []byte) error {
 		return err
 	}
 	// 记录写入索引树中
-	if ok := db.index.Put(key, pos); !ok {
-		return ErrIndexUpdateFailed
+	if oldValue := db.index.Put(key, pos); oldValue != nil {
+		db.reclaimSize += int64(oldValue.Size)
 	}
 	return nil
 }
@@ -113,13 +122,18 @@ func (db *DB) Delete(key []byte) error {
 		Type: data.LogRecordDeleted,
 	}
 	// 写入记录
-	_, err := db.appendLogRecordWithLock(logRecord)
+	pos, err := db.appendLogRecordWithLock(logRecord)
 	if err != nil {
 		return err
 	}
+	db.reclaimSize += int64(pos.Size)
 	// 删除索引 -- 对用户来说该key已经删除了
-	if !db.index.Delete(key) {
+	oldValue, ok := db.index.Delete(key)
+	if !ok {
 		return ErrIndexUpdateFailed
+	}
+	if oldValue != nil {
+		db.reclaimSize += int64(oldValue.Size)
 	}
 	return nil
 }
@@ -339,7 +353,7 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 		}
 	}
 	// 返回记录所对应的文件信息
-	pos := &data.LogRecordPos{Fid: db.activeFile.FileId, Offset: writeOff}
+	pos := &data.LogRecordPos{Fid: db.activeFile.FileId, Offset: writeOff, Size: uint32(size)}
 	return pos, nil
 }
 
@@ -419,18 +433,21 @@ func (db *DB) loadIndexFromDataFiles() error {
 		hasMerge = true
 	}
 
-	updateIndex := func(key []byte, typ data.LogRecordType, pos *data.LogRecordPos) error {
-		var ok bool
+	updateIndex := func(key []byte, typ data.LogRecordType, pos *data.LogRecordPos) {
+		var oldPos *data.LogRecordPos
 		//根据类型对记录进行相对应处理
 		if typ == data.LogRecordDeleted {
-			ok = db.index.Delete(key)
+			oldPos, _ = db.index.Delete(key)
+			db.reclaimSize += int64(pos.Size)
 		} else {
-			ok = db.index.Put(key, pos)
+			oldPos = db.index.Put(key, pos)
 		}
-		if !ok {
+		if oldPos == nil {
 			panic(ErrIndexUpdateFailed)
+		} else {
+			db.reclaimSize += int64(oldPos.Size)
 		}
-		return nil
+
 	}
 	transactionRecords := make(map[uint64][]*data.TransactionRecord)
 	var currentSeqNo uint64 = nonTransactionSeqNo
@@ -463,23 +480,20 @@ func (db *DB) loadIndexFromDataFiles() error {
 			logRecordPos := &data.LogRecordPos{
 				Fid:    fid,
 				Offset: offset,
+				Size:   uint32(size),
 			}
 
-			realkey, seqNo := parseLogRecordKey(logRecord.Key)
+			realKey, seqNo := parseLogRecordKey(logRecord.Key)
 			if seqNo == nonTransactionSeqNo {
-				if err := updateIndex(realkey, logRecord.Type, logRecordPos); err != nil {
-					return err
-				}
+				updateIndex(realKey, logRecord.Type, logRecordPos)
 			} else {
 				if logRecord.Type == data.LogRecordFinished {
 					for _, txnRecord := range transactionRecords[seqNo] {
-						if err := updateIndex(txnRecord.Record.Key, txnRecord.Record.Type, txnRecord.Pos); err != nil {
-							return err
-						}
+						updateIndex(txnRecord.Record.Key, txnRecord.Record.Type, txnRecord.Pos)
 					}
 					delete(transactionRecords, seqNo)
 				} else {
-					logRecord.Key = realkey
+					logRecord.Key = realKey
 					transactionRecords[seqNo] = append(transactionRecords[seqNo], &data.TransactionRecord{
 						Record: logRecord,
 						Pos:    logRecordPos,
@@ -534,4 +548,24 @@ func (db *DB) resetIOType() error {
 		}
 	}
 	return nil
+}
+
+func (db *DB) Stat() *Stat {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	dataFileNum := uint(len(db.olderFiles))
+	if db.activeFile != nil {
+		dataFileNum += 1
+	}
+	dirSize, err := utils.DirSize(db.options.DirPath)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get dir size :%v", err))
+	}
+	return &Stat{
+		keyNum:          uint(db.index.Size()),
+		DataFileNum:     dataFileNum,
+		reclaimableSize: db.reclaimSize,
+		DiskSize:        dirSize,
+	}
 }

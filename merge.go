@@ -2,6 +2,7 @@ package bitcask_go
 
 import (
 	"bitcask-go/data"
+	"bitcask-go/utils"
 	"errors"
 	"io"
 	"io/fs"
@@ -28,6 +29,27 @@ func (db *DB) Merge() error {
 		db.mu.Unlock() // TODO: 弄清楚这里为什么需要解锁
 		return ErrMergeIsProgress
 	}
+
+	totalSize, err := utils.DirSize(db.options.DirPath)
+	if err != nil {
+		db.mu.Unlock()
+		return err
+	}
+
+	if float32(db.reclaimSize)/float32(totalSize) < db.options.DataFileMergeRatio {
+		db.mu.Unlock()
+		return ErrMergeRatioUnreached
+	}
+
+	availableDiskSize, err := utils.AvailableDiskSize()
+	if err != nil {
+		db.mu.Unlock()
+		return err
+	}
+	if uint64(totalSize-db.reclaimSize) >= availableDiskSize {
+		return ErrNoEnoughSpaceForMerge
+	}
+
 	db.isMerging = true
 	defer func() {
 		db.isMerging = false
@@ -160,6 +182,9 @@ func (db *DB) loadMergeFiles() error {
 			mergeFinished = true
 		}
 		if entry.Name() == data.SeqNoFileName {
+			continue
+		}
+		if entry.Name() == fileLockName {
 			continue
 		}
 		mergeFileNames = append(mergeFileNames, entry.Name())

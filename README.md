@@ -233,6 +233,26 @@
       8. 加载过程中需要修改io类型
       9. 需要重置io类型，添加resetIoType 方法
       10. 对文件添加一个重置io类型
+
+
+1. 数据merge优化
+   1. 修改索引方法的返回值，改成返回旧值
+   2. 对应的索引器进行修改
+   3. 修改相关的单元测试
+   4. 在db结构体中添加一个字段 reclaimSize，递增旧值的size
+   5. 对logRecordSize 添加一个字段 Size，同时需要修改编码解码函数
+   6. 对于启动loadIndex函数，也是需要记录旧值
+   7. 构造内存索引函数，进行修改
+   8. 在batch里面也需要做同样的改造，对于Delete函数需要加上自己的key的size
+   9. 添加单元测试
+   10. 添加一个结构体Stat记录统计信息包含keyNum，DataFileNum、reclaimableSize、DiskSize
+   11. 添加一个函数Stat函数返回，相关统计信息
+   12. 对选项添加一个字段，DataFileMergeRatio 阈值，添加一个校验（不能大于1小于0）
+   13. 对Merge函数，获取总数居量，新增一个工具方法，获取目录的大小，写相关单元测试
+   14. 进行校验，总数据量是否达到阈值，如果小于返回自定义错误 ErrMergeRatioUnreached
+   15. 在工具，新增一个工具函数 AvailableDiskSize 获取磁盘剩余可用空间大小，相关单元测试
+   16. 在merge进行判断是否可以当前磁盘剩余空间是否可以容纳，如果不能返回自定义错误ErrNoEnoughSpaceForMerge
+   17. 单元测试
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/

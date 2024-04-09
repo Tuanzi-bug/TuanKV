@@ -18,6 +18,8 @@ type Options struct {
 	BytesPerSync uint
 
 	MMapAtStartup bool
+
+	DataFileMergeRatio float32
 }
 
 type IteratorOptions struct {
@@ -37,16 +39,20 @@ func checkOptions(options Options) error {
 	if options.DataFileSize <= 0 {
 		return errors.New("database data file size must be greater than 0")
 	}
+	if options.DataFileMergeRatio < 0 || options.DataFileMergeRatio > 1 {
+		return errors.New("invalid merge ratio, must between 0 and 1")
+	}
 	return nil
 }
 
 var DefaultOptions = Options{
-	DirPath:       path.Join("../tem"),
-	DataFileSize:  256 * 1024 * 1024, // 256MB
-	SyncWrites:    false,
-	IndexType:     index.BPTree,
-	BytesPerSync:  0,
-	MMapAtStartup: true,
+	DirPath:            path.Join("../tem"),
+	DataFileSize:       256 * 1024 * 1024, // 256MB
+	SyncWrites:         false,
+	IndexType:          index.BPTree,
+	BytesPerSync:       0,
+	MMapAtStartup:      true,
+	DataFileMergeRatio: 0.5,
 }
 
 var DefaultIteratorOptions = IteratorOptions{

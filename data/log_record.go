@@ -34,6 +34,7 @@ type LogRecordHeader struct {
 type LogRecordPos struct {
 	Fid    uint32 // File ID : represents that the file in which the data will be stored.
 	Offset int64  // offset in the file : represents where the data will be stored in the data file.
+	Size   uint32
 }
 
 type TransactionRecord struct {
@@ -91,20 +92,27 @@ func getLogRecordCRC(lr *LogRecord, header []byte) uint32 {
 }
 
 func EncodeLogRecordPos(pos *LogRecordPos) []byte {
-	buf := make([]byte, binary.MaxVarintLen32+binary.MaxVarintLen64)
+	buf := make([]byte, binary.MaxVarintLen32*2+binary.MaxVarintLen64)
 	index := 0
-	index += binary.PutUvarint(buf[index:], uint64(pos.Fid))
+	index += binary.PutVarint(buf[index:], int64(pos.Fid))
 	index += binary.PutVarint(buf[index:], pos.Offset)
+	index += binary.PutVarint(buf[index:], int64(pos.Size))
 	return buf[:index]
 }
 
 func DecodeLogRecordPos(buf []byte) *LogRecordPos {
+	if len(buf) == 0 {
+		return nil
+	}
 	var index = 0
 	fileId, n := binary.Varint(buf[index:])
 	index += n
-	offset, _ := binary.Varint(buf[index:])
+	offset, n := binary.Varint(buf[index:])
+	index += n
+	size, _ := binary.Varint(buf[index:])
 	return &LogRecordPos{
 		Fid:    uint32(fileId),
 		Offset: offset,
+		Size:   uint32(size),
 	}
 }
