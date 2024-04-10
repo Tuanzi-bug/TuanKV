@@ -2,6 +2,7 @@ package bitcask_go
 
 import (
 	"bitcask-go/data"
+	"bitcask-go/index"
 	"bitcask-go/utils"
 	"errors"
 	"io"
@@ -24,29 +25,30 @@ func (db *DB) Merge() error {
 		return nil
 	}
 	db.mu.Lock()
-
+	// 如果正在 merge，不能重复进行merge
 	if db.isMerging {
 		db.mu.Unlock() // TODO: 弄清楚这里为什么需要解锁
 		return ErrMergeIsProgress
 	}
-
+	// 查询merge的数据量
 	totalSize, err := utils.DirSize(db.options.DirPath)
 	if err != nil {
 		db.mu.Unlock()
 		return err
 	}
-
+	// 判断当前无效数据量满足merge的阈值
 	if float32(db.reclaimSize)/float32(totalSize) < db.options.DataFileMergeRatio {
 		db.mu.Unlock()
 		return ErrMergeRatioUnreached
 	}
-
+	// 判断 当前磁盘容量是否满足merge的需求，一般磁盘容量是当前数据量的两倍
 	availableDiskSize, err := utils.AvailableDiskSize()
 	if err != nil {
 		db.mu.Unlock()
 		return err
 	}
 	if uint64(totalSize-db.reclaimSize) >= availableDiskSize {
+		db.mu.Unlock()
 		return ErrNoEnoughSpaceForMerge
 	}
 
@@ -54,40 +56,42 @@ func (db *DB) Merge() error {
 	defer func() {
 		db.isMerging = false
 	}()
-
+	// 持久化当前活跃文件
 	if err := db.activeFile.Sync(); err != nil {
+		db.mu.Unlock()
 		return err
 	}
+	// 将活跃文件转换为旧文件
 	db.olderFiles[db.activeFile.FileId] = db.activeFile
+	// 打开新的活跃文件，防止写入操作不能正常进行
 	if err := db.setActiveDataFile(); err != nil {
+		db.mu.Unlock()
 		return nil
 	}
-
+	// 记录没有参加merge的id
 	nonMergeFileId := db.activeFile.FileId
-
+	// 获取需要merge的文件数据
 	var mergeFiles []*data.DataFile
 	for _, file := range db.olderFiles {
 		mergeFiles = append(mergeFiles, file)
 	}
 	db.mu.Unlock() // TODO: 弄清楚这里为什么需要解锁
-
+	// 排序
 	sort.Slice(mergeFiles, func(i, j int) bool {
 		return mergeFiles[i].FileId < mergeFiles[j].FileId
 	})
-
+	// 如果发生过merge，将其删除
 	mergePath := db.getMergePath()
 	if _, err := os.Stat(mergePath); err == nil {
-		if err = os.Remove(mergePath); err != nil {
+		if err = os.RemoveAll(mergePath); err != nil {
 			return err
 		}
-	} else {
-		return err
 	}
-
+	//创建 merge 目录
 	if err := os.MkdirAll(mergePath, os.ModePerm); err != nil {
 		return err
 	}
-
+	// 打开一个新的实例
 	mergeOptions := db.options
 	mergeOptions.DirPath = mergePath
 	mergeOptions.SyncWrites = false
@@ -96,14 +100,17 @@ func (db *DB) Merge() error {
 	}()
 
 	mergeDB, err := Open(mergeOptions)
+	defer mergeDB.Close()
 	if err != nil {
 		return err
 	}
-
+	// 创建 hint 文件储存索引
 	hintFile, err := data.OpenHintFile(mergePath)
+	defer hintFile.Close()
 	if err != nil {
 		return err
 	}
+	// 遍历需要merge的文件
 	for _, mergeFile := range mergeFiles {
 		var offset int64 = 0
 		for {
@@ -117,10 +124,12 @@ func (db *DB) Merge() error {
 			realKey, _ := parseLogRecordKey(logRecord.Key)
 			logRecordPos := db.index.Get(realKey)
 			// todo: 弄清楚对于事务完成记录是否进行清除
-			if logRecordPos != nil && logRecordPos.Fid == mergeFile.FileId && logRecordPos.Offset == offset {
+			if logRecordPos != nil &&
+				logRecordPos.Fid == mergeFile.FileId &&
+				logRecordPos.Offset == offset {
 				// 清除事务标记
 				logRecord.Key = logRecordKeyWithSeq(realKey, nonTransactionSeqNo)
-				pos, err := mergeDB.appendLogRecord(logRecord)
+				pos, err := mergeDB.appendLogRecordWithLock(logRecord)
 				if err != nil {
 					return err
 				}
@@ -139,6 +148,7 @@ func (db *DB) Merge() error {
 	}
 
 	mergeFinishedFile, err := data.OpenMergeFinishedFile(mergePath)
+	defer mergeFinishedFile.Close()
 	if err != nil {
 		return err
 	}
@@ -165,12 +175,14 @@ func (db *DB) getMergePath() string {
 
 func (db *DB) loadMergeFiles() error {
 	mergePath := db.getMergePath()
+	// 判断是否存储merge目录
 	if _, err := os.Stat(mergePath); errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
 	defer func() {
 		_ = os.RemoveAll(mergePath)
 	}()
+	// 读取merge目录文件
 	dirEntries, err := os.ReadDir(mergePath)
 	if err != nil {
 		return err
@@ -181,10 +193,10 @@ func (db *DB) loadMergeFiles() error {
 		if entry.Name() == data.MergeFinishedFileName {
 			mergeFinished = true
 		}
-		if entry.Name() == data.SeqNoFileName {
+		if entry.Name() == data.SeqNoFileName || entry.Name() == fileLockName {
 			continue
 		}
-		if entry.Name() == fileLockName {
+		if db.options.IndexType == index.BPTree && (entry.Name() == index.BPlusTreeIndexFileName) {
 			continue
 		}
 		mergeFileNames = append(mergeFileNames, entry.Name())
@@ -219,6 +231,7 @@ func (db *DB) loadMergeFiles() error {
 
 func (db *DB) getNonMergeFileId(dirPath string) (uint32, error) {
 	mergeFinishedFile, err := data.OpenMergeFinishedFile(dirPath)
+	defer mergeFinishedFile.Close()
 	if err != nil {
 		return 0, err
 	}
@@ -239,7 +252,8 @@ func (db *DB) loadIndexFromHintFile() error {
 	if _, err := os.Stat(hintFileName); errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
-	hintFile, err := data.OpenHintFile(hintFileName)
+	hintFile, err := data.OpenHintFile(db.options.DirPath)
+	defer hintFile.Close()
 	if err != nil {
 		return err
 	}

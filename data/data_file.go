@@ -106,7 +106,7 @@ func (df *DataFile) readNBytes(n int64, offset int64) (b []byte, err error) {
 }
 
 func OpenHintFile(dirPath string) (*DataFile, error) {
-	fileName := filepath.Join(dirPath, DataFileNameSuffix)
+	fileName := filepath.Join(dirPath, HintFileName)
 	return newDataFile(fileName, 0, fio.StandardFIO)
 }
 

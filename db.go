@@ -152,6 +152,7 @@ func Open(options Options) (*DB, error) {
 		if err := os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
 			return nil, err
 		}
+
 	}
 
 	fileLock := flock.New(filepath.Join(options.DirPath, fileLockName))
@@ -183,16 +184,14 @@ func Open(options Options) (*DB, error) {
 	if err := db.loadMergeFiles(); err != nil {
 		return nil, err
 	}
-
 	// 加载数据文件信息
 	if err := db.loadDataFile(); err != nil {
 		return nil, err
 	}
-
+	if err := db.loadIndexFromHintFile(); err != nil {
+		return nil, err
+	}
 	if options.IndexType != index.BPTree {
-		if err := db.loadIndexFromHintFile(); err != nil {
-			return nil, err
-		}
 		// 加载索引信息（和文件信息对应）
 		if err := db.loadIndexFromDataFiles(); err != nil {
 			return nil, err
@@ -204,7 +203,6 @@ func Open(options Options) (*DB, error) {
 		}
 	} else {
 		if err := db.loadSeqNo(); err != nil {
-			fmt.Println(err)
 			return nil, err
 		}
 		if db.activeFile != nil {
@@ -425,7 +423,7 @@ func (db *DB) loadIndexFromDataFiles() error {
 	hasMerge, nonMergeFileId := false, uint32(0)
 	mergeFileName := filepath.Join(db.options.DirPath, data.MergeFinishedFileName)
 	if _, err := os.Stat(mergeFileName); err == nil {
-		fid, err := db.getNonMergeFileId(mergeFileName)
+		fid, err := db.getNonMergeFileId(db.options.DirPath)
 		if err != nil {
 			return err
 		}
@@ -442,9 +440,7 @@ func (db *DB) loadIndexFromDataFiles() error {
 		} else {
 			oldPos = db.index.Put(key, pos)
 		}
-		if oldPos == nil {
-			panic(ErrIndexUpdateFailed)
-		} else {
+		if oldPos != nil {
 			db.reclaimSize += int64(oldPos.Size)
 		}
 

@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	bPlusTreeIndexFileName = "bptree-index"
+	BPlusTreeIndexFileName = "bptree-index"
 )
 
 var indexBucketName = []byte("bitcask-index")
@@ -20,7 +20,7 @@ func NewBPlusTree(dirPath string) *BPlusTree {
 	// todo: 解决bptree多个参数传递
 	opts := bbolt.DefaultOptions
 	opts.NoSync = true
-	bpTree, err := bbolt.Open(filepath.Join(dirPath, bPlusTreeIndexFileName), 0644, opts)
+	bpTree, err := bbolt.Open(filepath.Join(dirPath, BPlusTreeIndexFileName), 0644, opts)
 	if err != nil {
 		panic("failed to open bpTree")
 	}

@@ -51,7 +51,7 @@ var DefaultOptions = Options{
 	SyncWrites:         false,
 	IndexType:          index.BPTree,
 	BytesPerSync:       0,
-	MMapAtStartup:      true,
+	MMapAtStartup:      false,
 	DataFileMergeRatio: 0.5,
 }
 

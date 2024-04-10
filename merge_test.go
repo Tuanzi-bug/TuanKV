@@ -69,7 +69,7 @@ func TestDB_Merge3(t *testing.T) {
 	opts.DataFileMergeRatio = 0
 	opts.DirPath = dir
 	db, err := Open(opts)
-	defer destroyDB(db)
+	//defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
