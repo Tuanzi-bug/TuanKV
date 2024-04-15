@@ -264,6 +264,18 @@
    6. 在db新增一个方法
    7. 加锁，排除文件锁文件
    8. 添加单元测试
+
+
+1. HTTP接口
+   1. 初始化DB实例，函数
+   2. 使用Go语言自带的Http库，添加相关方法，包括：Put、Get、Delete、Stat、ListKeys
+   3. 后续可以根据需求进行添加
+   4. Put：校验请求方式，然后对请求主体进行json解码，遍历map将值写入数据库中
+   5. Get：校验请求方式，获取请求的key，获取数据，返回json数据（需设置头 Content-Type）
+   6. 其余方式可参考进行写
+
+
+1. 基准测试
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/
