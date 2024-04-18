@@ -276,6 +276,20 @@
 
 
 1. 基准测试
+
+
+1. redis String
+   1. 新建一个types文件，各个类型实现的方法，枚举类型 String Hash...
+   2. 创建RedisDataStructure,以及New函数
+   3. 创建Set函数，key ttl value
+   4. 编码 1b 存储类型，过期时间，与value组合在一起
+   5. 调用存储引擎接口进行写入
+   6. Get方法实现，通过存储引擎拿到数据
+   7. 对数据进行解码，首先判断类型，返回自定义错误ErrWrongTypeOperation、判断是否过期，返回nil
+   8. 对于通用命令 Delete type，可以创建generic文件
+   9. Delete 调用接口
+   10. Type 先获取value，返回第一个字节
+   11. 写单元测试
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/
