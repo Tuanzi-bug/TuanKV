@@ -49,7 +49,7 @@ var DefaultOptions = Options{
 	DirPath:            path.Join("../tem"),
 	DataFileSize:       256 * 1024 * 1024, // 256MB
 	SyncWrites:         false,
-	IndexType:          index.BPTree,
+	IndexType:          index.Btree,
 	BytesPerSync:       0,
 	MMapAtStartup:      false,
 	DataFileMergeRatio: 0.5,

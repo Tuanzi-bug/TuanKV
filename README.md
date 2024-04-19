@@ -290,6 +290,17 @@
    9. Delete 调用接口
    10. Type 先获取value，返回第一个字节
    11. 写单元测试
+
+
+1. Hash
+   1. 创建 meta 文件，存储元数据结构体
+   2. 写编码与解码的方法
+   3. 编码：数据类型+过期时间+版本号+数据量，如果是list还需要添加专用字段
+   4. 解码：返回数据结构
+   5. 实现通用方法 findMetaData ，判断key是否存在，判断元数据是否存在，根据存在情况，返回meta数据
+   6. 实现对hash的key进行编解码。
+   7. 实现 HSet ：先获取元数据，构造hash key， 编码，然后 
+   8. 单元测试
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/
