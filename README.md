@@ -301,6 +301,12 @@
    6. 实现对hash的key进行编解码。
    7. 实现 HSet ：先获取元数据，构造hash key， 编码，然后 
    8. 单元测试
+
+
+1. Set
+   1. SAdd: 查找元数据，返回元数据，构造set的key
+   2. SRem
+   3. SIsMember
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/

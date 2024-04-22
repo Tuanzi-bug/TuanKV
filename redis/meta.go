@@ -87,3 +87,27 @@ func (hk hashInternalKey) encode() []byte {
 
 	return buf
 }
+
+type setInternalKey struct {
+	key     []byte
+	version int64
+	member  []byte
+}
+
+func (sk setInternalKey) encode() []byte {
+	size := len(sk.key) + len(sk.member) + binary.MaxVarintLen64 + binary.MaxVarintLen32
+	buf := make([]byte, size)
+
+	index := 0
+	copy(buf[index:], sk.key)
+	index += len(sk.key)
+
+	index += binary.PutVarint(buf[index:], sk.version)
+
+	copy(buf[index:], sk.member)
+	index += len(sk.member)
+
+	binary.LittleEndian.PutUint32(buf[index:], uint32(len(sk.member)))
+
+	return buf
+}

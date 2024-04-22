@@ -159,6 +159,95 @@ func (rds DataStructure) HDel(key, field []byte) (bool, error) {
 	return exist, nil
 }
 
+func (rds DataStructure) SAdd(key, member []byte) (bool, error) {
+	meta, err := rds.findMetadata(key, Set)
+	if err != nil {
+		return false, err
+	}
+
+	sk := setInternalKey{
+		key:     key,
+		version: meta.version,
+		member:  member,
+	}
+	encKey := sk.encode()
+
+	var ok bool
+	if _, err := rds.db.Get(encKey); errors.Is(err, bitcask.ErrKeyNotFound) {
+		wb := rds.db.NewWriteBatch(bitcask.DefaultWriteBatchOptions)
+		meta.size++
+		_ = wb.Put(key, meta.encode())
+		_ = wb.Put(encKey, nil)
+		if err = wb.Commit(); err != nil {
+			return false, err
+		}
+		ok = true
+	}
+	return ok, nil
+}
+
+func (rds DataStructure) SIsMember(key, member []byte) (bool, error) {
+	meta, err := rds.findMetadata(key, Set)
+	if err != nil {
+		return false, err
+	}
+	if meta.size == 0 {
+		return false, nil
+	}
+
+	sk := setInternalKey{
+		key:     key,
+		version: meta.version,
+		member:  member,
+	}
+	encKey := sk.encode()
+	_, err = rds.db.Get(encKey)
+	if err != nil && !errors.Is(err, bitcask.ErrKeyNotFound) {
+		return false, err
+	}
+
+	if errors.Is(err, bitcask.ErrKeyNotFound) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (rds DataStructure) SRem(key, member []byte) (bool, error) {
+	meta, err := rds.findMetadata(key, Set)
+	if err != nil {
+		return false, err
+	}
+
+	if meta.size == 0 {
+		return false, nil
+	}
+
+	sk := setInternalKey{
+		key:     key,
+		version: meta.version,
+		member:  member,
+	}
+	encKey := sk.encode()
+
+	_, err = rds.db.Get(encKey)
+	if err != nil && !errors.Is(err, bitcask.ErrKeyNotFound) {
+		return false, err
+	}
+
+	if errors.Is(err, bitcask.ErrKeyNotFound) {
+		return false, nil
+	}
+
+	wb := rds.db.NewWriteBatch(bitcask.DefaultWriteBatchOptions)
+	meta.size--
+	_ = wb.Put(key, meta.encode())
+	_ = wb.Delete(encKey)
+	if err = wb.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (rds DataStructure) findMetadata(key []byte, dataType DataType) (*metadata, error) {
 	metaBuf, err := rds.db.Get(key)
 	if err != nil && !errors.Is(err, bitcask.ErrKeyNotFound) {
