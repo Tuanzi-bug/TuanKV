@@ -111,3 +111,23 @@ func (sk setInternalKey) encode() []byte {
 
 	return buf
 }
+
+type listInternalKey struct {
+	key     []byte
+	version int64
+	index   uint64
+}
+
+func (lk listInternalKey) encode() []byte {
+	size := len(lk.key) + binary.MaxVarintLen64 + binary.MaxVarintLen64
+	buf := make([]byte, size)
+
+	index := 0
+	copy(buf[index:], lk.key)
+	index += len(lk.key)
+
+	index += binary.PutVarint(buf[index:], lk.version)
+	index += binary.PutUvarint(buf[index:], lk.index)
+
+	return buf
+}
