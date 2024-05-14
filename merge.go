@@ -1,10 +1,10 @@
 package bitcask_go
 
 import (
-	"bitcask-go/data"
-	"bitcask-go/index"
-	"bitcask-go/utils"
 	"errors"
+	"github.com/Tuanzi-bug/TuanKV/data"
+	"github.com/Tuanzi-bug/TuanKV/index"
+	"github.com/Tuanzi-bug/TuanKV/utils"
 	"io"
 	"io/fs"
 	"os"

@@ -1,9 +1,9 @@
 package benchmark
 
 import (
-	bitcask "bitcask-go"
-	"bitcask-go/utils"
 	"errors"
+	bitcask "github.com/Tuanzi-bug/TuanKV"
+	"github.com/Tuanzi-bug/TuanKV/utils"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"os"

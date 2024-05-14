@@ -1,7 +1,7 @@
 package index
 
 import (
-	"bitcask-go/data"
+	"github.com/Tuanzi-bug/TuanKV/data"
 	"go.etcd.io/bbolt"
 	"path/filepath"
 )

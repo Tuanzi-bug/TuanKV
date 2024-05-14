@@ -1,7 +1,7 @@
 package bitcask_go
 
 import (
-	"bitcask-go/utils"
+	"github.com/Tuanzi-bug/TuanKV/utils"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -11,6 +11,7 @@ import (
 func destroyDB(db *DB) {
 	if db != nil {
 		_ = db.Close()
+
 		//if db.activeFile != nil {
 		//	_ = db.Close()
 		//}

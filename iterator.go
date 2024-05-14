@@ -1,8 +1,8 @@
 package bitcask_go
 
 import (
-	"bitcask-go/index"
 	"bytes"
+	"github.com/Tuanzi-bug/TuanKV/index"
 )
 
 type Iterator struct {

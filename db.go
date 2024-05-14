@@ -1,11 +1,11 @@
 package bitcask_go
 
 import (
-	"bitcask-go/data"
-	"bitcask-go/fio"
-	"bitcask-go/index"
-	"bitcask-go/utils"
 	"fmt"
+	"github.com/Tuanzi-bug/TuanKV/data"
+	"github.com/Tuanzi-bug/TuanKV/fio"
+	"github.com/Tuanzi-bug/TuanKV/index"
+	"github.com/Tuanzi-bug/TuanKV/utils"
 	"github.com/gofrs/flock"
 	"io"
 	"os"
@@ -277,6 +277,9 @@ func (db *DB) Close() error {
 			return err
 		}
 		if err := seqDataFile.Sync(); err != nil {
+			return err
+		}
+		if err := seqDataFile.Close(); err != nil {
 			return err
 		}
 	}

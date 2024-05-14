@@ -1,8 +1,8 @@
 package redis
 
 import (
-	bitcask "bitcask-go"
-	"bitcask-go/utils"
+	bitcask "github.com/Tuanzi-bug/TuanKV"
+	"github.com/Tuanzi-bug/TuanKV/utils"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"

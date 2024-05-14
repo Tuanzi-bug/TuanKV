@@ -1,7 +1,7 @@
 package index
 
 import (
-	"bitcask-go/data"
+	"github.com/Tuanzi-bug/TuanKV/data"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"

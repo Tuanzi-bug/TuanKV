@@ -1,8 +1,8 @@
 package bitcask_go
 
 import (
-	"bitcask-go/index"
 	"errors"
+	"github.com/Tuanzi-bug/TuanKV/index"
 	"path"
 )
 

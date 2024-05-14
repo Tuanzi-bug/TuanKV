@@ -1,9 +1,9 @@
 package bitcask_go
 
 import (
-	"bitcask-go/data"
-	"bitcask-go/index"
 	"encoding/binary"
+	"github.com/Tuanzi-bug/TuanKV/data"
+	"github.com/Tuanzi-bug/TuanKV/index"
 	"sync"
 	"sync/atomic"
 )
@@ -125,7 +125,6 @@ func (wb *WriteBatch) Commit() error {
 	}
 
 	wb.pendingWrite = make(map[string]*data.LogRecord)
-
 	return nil
 }
 
