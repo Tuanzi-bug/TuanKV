@@ -307,6 +307,12 @@
    1. SAdd: 查找元数据，返回元数据，构造set的key
    2. SRem
    3. SIsMember
+
+
+1. redis 协议
+参考：
+* https://www.cnblogs.com/Finley/category/1598973.html
+* https://strikefreedom.top/archives/go-event-loop-networking-library-gnet#toc-head-33
 ## 相关参考
 
 * https://codecapsule.com/2012/11/07/ikvs-implementing-a-key-value-store-table-of-contents/
