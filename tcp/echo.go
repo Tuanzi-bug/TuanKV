@@ -65,8 +65,8 @@ func (h *EchoHandler) Handle(ctx context.Context, conn net.Conn) {
 		// 发送完毕, 结束waiting
 		client.Waiting.Done()
 	}
-
 }
+
 func (h *EchoHandler) Close() error {
 	logger.Info("handler shutting down...")
 	h.closing.Set(true)
