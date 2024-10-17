@@ -9,11 +9,11 @@ import (
 type Options struct {
 	DirPath string // Database file address
 
-	DataFileSize int64
+	DataFileSize int64 // 文件最大内存设置
 
 	SyncWrites bool
 
-	IndexType index.IndexType
+	IndexType index.IndexType // 引擎类别
 
 	BytesPerSync uint
 

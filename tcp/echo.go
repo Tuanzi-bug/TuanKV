@@ -13,8 +13,8 @@ import (
 )
 
 type EchoHandler struct {
-	activeConn sync.Map
-	closing    atomic.Boolean
+	activeConn sync.Map       // 记录所有活跃的连接
+	closing    atomic.Boolean // 关闭标志
 }
 
 type EchoClient struct {
@@ -30,7 +30,7 @@ func MakeEchoHandler() *EchoHandler {
 }
 
 func (c *EchoClient) Close() error {
-	// 等待服务端发送数据完成
+	// 等待发送完毕，超时时间10s
 	c.Waiting.WaitWithTimeout(10 * time.Second)
 	_ = c.Conn.Close()
 	return nil
@@ -45,10 +45,12 @@ func (h *EchoHandler) Handle(ctx context.Context, conn net.Conn) {
 	client := &EchoClient{Conn: conn}
 	h.activeConn.Store(client, struct{}{}) // 记住仍然存活的连接
 
+	// 接受数据流
 	reader := bufio.NewReader(conn)
 	for {
 		msg, err := reader.ReadString('\n')
 		if err != nil {
+			// 客户端结束连接
 			if err == io.EOF {
 				logger.Info("client closed")
 				h.activeConn.Delete(client)
@@ -61,7 +63,7 @@ func (h *EchoHandler) Handle(ctx context.Context, conn net.Conn) {
 		client.Waiting.Add(1)
 
 		b := []byte(msg)
-		_, _ = conn.Write(b)
+		_, _ = conn.Write(b) // 发送数据
 		// 发送完毕, 结束waiting
 		client.Waiting.Done()
 	}
@@ -77,4 +79,9 @@ func (h *EchoHandler) Close() error {
 		return true
 	})
 	return nil
+}
+
+// RemoteAddr returns the remote network address
+func (c *EchoClient) RemoteAddr() string {
+	return c.Conn.RemoteAddr().String()
 }

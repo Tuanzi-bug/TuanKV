@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Tuanzi-bug/TuanKV/interface/tcp"
+	"github.com/Tuanzi-bug/TuanKV/redis/interface/tcp"
 	"github.com/hdt3213/godis/lib/logger"
 	"net"
 	"os"
@@ -30,6 +30,7 @@ func ListenAndServeWithSignal(cfg *Config, handler tcp.Handler) error {
 	sigCh := make(chan os.Signal, 1)
 	// 监听系统指定信号 SIGHUP：终端挂起或者控制进程终止，SIGQUIT：终端退出，SIGTERM：终止信号，SIGINT：中断信号
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
+	// 监听
 	go func() {
 		sig := <-sigCh
 		switch sig {
@@ -53,6 +54,7 @@ func ListenAndServe(listener net.Listener, handler tcp.Handler, closeChan <-chan
 	errCh := make(chan error, 1)
 	defer close(errCh)
 	go func() {
+		// 监听关闭信号和错误信号
 		select {
 		case <-closeChan:
 			logger.Info("get exit signal")
@@ -60,11 +62,13 @@ func ListenAndServe(listener net.Listener, handler tcp.Handler, closeChan <-chan
 			logger.Info(fmt.Sprintf("accept error: %s", er.Error()))
 		}
 		logger.Info("shutting down...")
+		// 关闭监听和关闭方法
 		_ = listener.Close()
-		_ = handler.Close() //close connections
+		_ = handler.Close()
 	}()
 
 	ctx := context.Background()
+	// 用于等待所有连接处理完成
 	var waitDone sync.WaitGroup
 	for {
 		//  Accept 会一直阻塞直到有新的连接建立或者listen中断才会返回

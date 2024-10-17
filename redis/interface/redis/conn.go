@@ -27,11 +27,11 @@ type Connection interface {
 	GetDBIndex() int
 	SelectDB(int)
 
-	SetSlave()
-	IsSlave() bool
-
-	SetMaster()
-	IsMaster() bool
+	//SetSlave()
+	//IsSlave() bool
+	//
+	//SetMaster()
+	//IsMaster() bool
 
 	Name() string
 }

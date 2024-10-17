@@ -2,7 +2,7 @@ package client
 
 import (
 	"errors"
-	"github.com/Tuanzi-bug/TuanKV/interface/redis"
+	"github.com/Tuanzi-bug/TuanKV/redis/interface/redis"
 	"github.com/Tuanzi-bug/TuanKV/redis/parser"
 	"github.com/Tuanzi-bug/TuanKV/redis/protocol"
 	"github.com/hdt3213/godis/lib/logger"

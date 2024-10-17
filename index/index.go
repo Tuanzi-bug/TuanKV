@@ -8,12 +8,12 @@ import (
 
 // Indexer is an interface that represents the index of the data records.
 type Indexer interface {
-	Put(key []byte, pos *data.LogRecordPos) *data.LogRecordPos // Put is a interface method that puts the data record into the index.
-	Get(key []byte) *data.LogRecordPos                         // Get is a interface method that gets the data record from the index.
-	Delete(key []byte) (*data.LogRecordPos, bool)              // delete is a interface method that deletes the data record from the index.
-	Iterator(reverse bool) Iterator
-	Size() int
-	Close() error
+	Put(key []byte, pos *data.LogRecordPos) *data.LogRecordPos // Put is an interface method that puts the data record into the index.
+	Get(key []byte) *data.LogRecordPos                         // Get is an interface method that gets the data record from the index.
+	Delete(key []byte) (*data.LogRecordPos, bool)              // delete is an interface method that deletes the data record from the index.
+	Iterator(reverse bool) Iterator                            // Iterator is an interface method that returns an iterator for the index.
+	Size() int                                                 // Size is an interface method that returns the size of the index.
+	Close() error                                              // Close is an interface method that closes the index.
 }
 
 type Item struct {
@@ -36,9 +36,8 @@ func NewIndexer(indextype IndexType, dirPath string) Indexer {
 		return NewBTree()
 	case Art:
 		return NewART()
-	case BPTree:
-		return NewBPlusTree(dirPath)
-
+	//case BPTree:
+	//	return NewBPlusTree(dirPath)
 	default:
 		panic("unsupported index type")
 	}

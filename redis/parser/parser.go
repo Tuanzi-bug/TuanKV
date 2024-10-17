@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"github.com/Tuanzi-bug/TuanKV/interface/redis"
+	"github.com/Tuanzi-bug/TuanKV/redis/interface/redis"
 	"github.com/Tuanzi-bug/TuanKV/redis/protocol"
 	"github.com/hdt3213/godis/lib/logger"
 
@@ -68,6 +68,7 @@ func parse0(rawReader io.Reader, ch chan<- *Payload) {
 	}()
 	reader := bufio.NewReader(rawReader)
 	for {
+		// 按照 RESP 协议，每一行都以 \r\n 结尾，\r\n 进行切分
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			ch <- &Payload{
@@ -77,8 +78,10 @@ func parse0(rawReader io.Reader, ch chan<- *Payload) {
 			return
 		}
 		length := len(line)
-		// 忽略空行
+
 		if length <= 2 || line[length-2] != '\r' {
+			// there are some empty lines within replication traffic, ignore this error
+			//  protocolError(ch, "empty line")
 			continue
 		}
 		// 处理尾部的 \r\n
@@ -126,7 +129,6 @@ func parse0(rawReader io.Reader, ch chan<- *Payload) {
 			args := bytes.Split(line, []byte{' '})
 			ch <- &Payload{Data: protocol.MakeMultiBulkReply(args)}
 		}
-
 	}
 }
 

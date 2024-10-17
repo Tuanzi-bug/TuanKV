@@ -2,7 +2,7 @@ package protocol
 
 import (
 	"bytes"
-	"github.com/Tuanzi-bug/TuanKV/interface/redis"
+	"github.com/Tuanzi-bug/TuanKV/redis/interface/redis"
 	"strconv"
 )
 
@@ -23,7 +23,7 @@ func MakeBulkReply(arg []byte) *BulkReply {
 // 简单字符串：以"+" 开始， 如："+OK\r\n"
 // 错误：以"-" 开始，如："-ERR Invalid Synatx\r\n"
 // 整数：以":"开始，如：":1\r\n"
-func (r BulkReply) ToBytes() []byte {
+func (r *BulkReply) ToBytes() []byte {
 	if r.Arg == nil {
 		return nullBulkBytes
 	}
@@ -38,16 +38,16 @@ func MakeMultiBulkReply(args [][]byte) *MultiBulkReply {
 	return &MultiBulkReply{Args: args}
 }
 
-func (r MultiBulkReply) ToBytes() []byte {
+func (r *MultiBulkReply) ToBytes() []byte {
 	var buf bytes.Buffer
 
 	argLen := len(r.Args)
-	bufLen := 1 + len(strconv.Itoa(argLen)) + 2 // 第一行长度（类型+长度+crlf）
+	bufLen := 1 + len(strconv.Itoa(argLen)) + 2 // 类型+长度+crlf
 	for _, arg := range r.Args {
 		if arg == nil {
 			bufLen += 3 + 2 // $-1 + crlf
 		} else {
-			bufLen += 1 + len(strconv.Itoa(len(arg))) + 2 + len(arg) + 2 // 第一行为 $+正文长度+crlf，第二行为实际内容+crlf。
+			bufLen += 1 + len(strconv.Itoa(len(arg))) + 2 + len(arg) + 2 // $+正文长度+crlf+实际内容+crlf。
 		}
 	}
 
@@ -70,7 +70,7 @@ func (r MultiBulkReply) ToBytes() []byte {
 	return buf.Bytes()
 }
 
-// StatusReply 简单字符串：以"+" 开始， 如："+OK\r\n"
+// StatusReply 回复状态：以"+" 开始， 如："+OK\r\n"
 type StatusReply struct {
 	Status string
 }
@@ -101,7 +101,7 @@ type ErrorReply interface {
 	ToBytes() string
 }
 
-// StandardErrReply 错误：以"-" 开始，如："-ERR Invalid Synatx\r\n"
+// StandardErrReply 标准的错误：以"-" 开始，如："-ERR Invalid Synatx\r\n"
 type StandardErrReply struct {
 	Status string
 }

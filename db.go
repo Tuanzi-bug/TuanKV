@@ -5,6 +5,7 @@ import (
 	"github.com/Tuanzi-bug/TuanKV/data"
 	"github.com/Tuanzi-bug/TuanKV/fio"
 	"github.com/Tuanzi-bug/TuanKV/index"
+	redis2 "github.com/Tuanzi-bug/TuanKV/redis/interface/redis"
 	"github.com/Tuanzi-bug/TuanKV/utils"
 	"github.com/gofrs/flock"
 	"io"
@@ -36,6 +37,16 @@ type DB struct {
 	fileLock        *flock.Flock
 	bytesWrite      uint
 	reclaimSize     int64
+}
+
+func (db *DB) Exec(client redis2.Connection, cmdLine [][]byte) redis2.Reply {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (db *DB) AfterClientClose(c redis2.Connection) {
+	//TODO implement me
+	panic("implement me")
 }
 
 type Stat struct {
