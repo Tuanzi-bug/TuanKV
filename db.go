@@ -579,6 +579,7 @@ func (db *DB) Stat() *Stat {
 		DiskSize:        dirSize,
 	}
 }
+
 func (db *DB) Backup(dir string) error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()

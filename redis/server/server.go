@@ -3,8 +3,8 @@ package server
 import (
 	"context"
 	"errors"
-	bitcask "github.com/Tuanzi-bug/TuanKV"
 	"github.com/Tuanzi-bug/TuanKV/redis/connection"
+	database2 "github.com/Tuanzi-bug/TuanKV/redis/database"
 	"github.com/Tuanzi-bug/TuanKV/redis/interface/database"
 	"github.com/Tuanzi-bug/TuanKV/redis/parser"
 	"github.com/Tuanzi-bug/TuanKV/redis/protocol"
@@ -32,11 +32,12 @@ func (h *Handler) closeClient(client *connection.Connection) {
 }
 
 func MakeHandler() *Handler {
-	var db *bitcask.DB
-	db, err := bitcask.Open(bitcask.DefaultOptions)
-	if err != nil {
-		return nil
-	}
+	//var db *bitcask.DB
+	//db, err := bitcask.Open(bitcask.DefaultOptions)
+	//if err != nil {
+	//	return nil
+	//}
+	db := database2.NewStandaloneServer()
 	return &Handler{db: db}
 }
 

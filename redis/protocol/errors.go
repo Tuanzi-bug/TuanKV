@@ -14,20 +14,20 @@ func (r *UnknownErrReply) Error() string {
 
 var unknownErrBytes = []byte("-Err unknown\r\n")
 
-// ArgNumErrReply wrong number of arguments for command 命令错误
+// ArgNumErrReply wrong number of arguments for database 命令错误
 type ArgNumErrReply struct {
 	Cmd string
 }
 
 func (r *ArgNumErrReply) Error() string {
-	return "ERR wrong number of arguments for '" + r.Cmd + "' command"
+	return "ERR wrong number of arguments for '" + r.Cmd + "' database"
 }
 
 func (r *ArgNumErrReply) ToBytes() []byte {
-	return []byte("-ERR wrong number of arguments for '" + r.Cmd + "' command\r\n")
+	return []byte("-ERR wrong number of arguments for '" + r.Cmd + "' database\r\n")
 }
 
-// MakeArgNumErrReply represents wrong number of arguments for command
+// MakeArgNumErrReply represents wrong number of arguments for database
 func MakeArgNumErrReply(cmd string) *ArgNumErrReply {
 	return &ArgNumErrReply{
 		Cmd: cmd,
@@ -81,5 +81,5 @@ func (r *ProtocolErrReply) ToBytes() []byte {
 }
 
 func (r *ProtocolErrReply) Error() string {
-	return "ERR Protocol error '" + r.Msg + "' command"
+	return "ERR Protocol error '" + r.Msg + "' database"
 }

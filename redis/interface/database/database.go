@@ -1,16 +1,16 @@
 package database
 
 import (
-	redis2 "github.com/Tuanzi-bug/TuanKV/redis/interface/redis"
+	"github.com/Tuanzi-bug/TuanKV/redis/interface/redis"
 )
 
-// CmdLine is alias for [][]byte, represents a command line  CmdLine是[][]byte的别名，表示一行命令
+// CmdLine is alias for [][]byte, represents a database line  CmdLine是[][]byte的别名，表示一行命令
 type CmdLine = [][]byte
 
 // DB is the interface for redis style storage engine  DB是redis风格存储引擎的接口
 type DB interface {
-	Exec(client redis2.Connection, cmdLine [][]byte) redis2.Reply
-	AfterClientClose(c redis2.Connection)
+	Exec(client redis.Connection, cmdLine [][]byte) redis.Reply
+	AfterClientClose(c redis.Connection)
 	Close() error
 	//LoadRDB(dec *core.Decoder) error
 }

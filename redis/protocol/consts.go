@@ -10,6 +10,10 @@ func (r *PongReply) ToBytes() []byte {
 	return pongBytes
 }
 
+func MakePongBytes() *PongReply {
+	return &PongReply{}
+}
+
 // OkReply is +OK
 type OkReply struct{}
 

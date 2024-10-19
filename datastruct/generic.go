@@ -1,4 +1,4 @@
-package redis
+package datastruct
 
 import "errors"
 
